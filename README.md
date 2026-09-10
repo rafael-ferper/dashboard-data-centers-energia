@@ -49,16 +49,28 @@ Regra que trava o escopo: gráfico sem pergunta sai.
 
 Laranja contra cinza é seguro para os tipos comuns de daltonismo.
 
-## Antes de apresentar
+## Números verificados (08/09)
 
-Três números ainda estão marcados `[VERIFICAR]` no código:
+| Dado | Situação | Fonte |
+|---|---|---|
+| 26,2 GW em pedidos de conexão | **Confirmado.** Passou de 19,8 GW (set/2025) para 26,2 GW (nov/2025) | Site da EPE |
+| Pico máximo do país: 105 GW | **Confirmado**, fev/2025 | EPE, via Caderno de Transmissão do PDE 2035 |
+| Fim da moratória de Dublin | **Confirmado.** Encerrada em dez/2025 por decisão da CRU, com exigência de geração própria e 80% de renovável em seis anos | CRU |
+| 97% dos data centers irlandeses na região de Dublin, ~50% da demanda regional | Encontrado em análise da decisão da CRU. Usar como frase, não como gráfico | análise secundária |
+| 1,7% do consumo brasileiro | **Não confirmado no estudo original.** Fica identificado no painel como levantamento da Brasscom, que é parte interessada | Brasscom |
+| ~800 MW de capacidade instalada | **Descartado.** As fontes iam de 481 a 950 MW conforme ano e metodologia, e a unidade não era comparável a pedido de conexão | várias |
 
-1. **26.200 MW em pedidos de conexão** — confirmar no Caderno de Transmissão do PDE 2035 (EPE)
-2. **800 MW de capacidade instalada** — achei 826, ~800 e 580 MW em fontes diferentes
-3. **Status atual da moratória de Dublin** — fontes divergem entre "pausa até 2028" e "suspensa recentemente". Confirmar na CRU ou EirGrid.
+### Por que o gráfico 6 mudou
 
-O 1,7% da Brasscom já está rotulado no dashboard como levantamento da associação
-do setor, o que é essencial: é parte interessada.
+A versão anterior comparava 26.200 MW de pedidos de conexão com 800 MW de
+capacidade instalada. São unidades diferentes: pedido de conexão é potência
+contratada na rede, capacidade instalada é carga de TI, e refrigeração acrescenta
+por volta de 30% sobre essa carga. O multiplicador ficava inflado por um fator
+desconhecido.
+
+A comparação atual, 26,2 GW de pedidos contra 105 GW de pico do sistema, usa a
+mesma grandeza nos dois lados e vem da mesma fonte.
+
 
 ## O que ainda não está feito
 

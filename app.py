@@ -19,7 +19,8 @@ BASE_DIR = Path(__file__).resolve().parent
 # UMA cor saturada, usada SO no que responde a questao central. Resto em cinza.
 # Laranja vs cinza e seguro para os tipos comuns de daltonismo.
 # ---------------------------------------------------------------------------
-ACCENT = "#E8590C"  # data centers  (o sujeito da questao central)
+ACCENT = "#E8590C"  # REGRA: laranja marca data centers, e nada alem disso.
+#                       Cinza e todo o resto: pais, contexto, marcacao de evento.
 ACCENT_SOFT = "#FD9A63"  # data centers, papel secundario
 GRAY_DARK = "#6C757D"  # series de contexto
 GRAY_MID = "#ADB5BD"  # series de contexto, menos importante
@@ -44,7 +45,13 @@ LOCALE_BR = {
 
 
 def fmt(n):
+    """Milhar em pt-BR: 6422 -> 6.422"""
     return f"{int(n):,}".replace(",", ".")
+
+
+def pct(x, casas=1):
+    """Decimal em pt-BR: 19.9 -> 19,9"""
+    return f"{x:.{casas}f}".replace(".", ",")
 
 
 st.set_page_config(page_title="Data centers e consumo eletrico", layout="wide")
@@ -127,32 +134,53 @@ def base_eixos(chart):
 # ---------------------------------------------------------------------------
 # Sem cor de texto fixa: quem define e o tema. So o destaque laranja e fixo,
 # porque laranja tem contraste suficiente em fundo claro e escuro.
-st.markdown("## Quase todo o crescimento elétrico da Irlanda veio de data centers")
 st.markdown(
-    f"<p style='font-size:1.25rem;margin-top:-8px;line-height:1.5'>"
-    f"Entre 2015 e 2025 o consumo do país subiu {fmt(d_total)} GWh. "
-    f"Data centers responderam por <b style='color:{ACCENT}'>{fmt(d_dc)} GWh, "
-    f"{pct_dc:.0f}% do total</b>. Hoje eles são 23% de toda a eletricidade medida "
-    f"na Irlanda.</p>"
-    f"<p style='opacity:.7;font-size:.95rem;margin-top:2px'>"
-    f"Feito para gestores públicos municipais avaliando a instalação de um data "
-    f"center na sua cidade.</p>",
+    "## A evolução do consumo energético frente ao crescimento dos data centers, um comparativo entre Irlanda e Brasil"
+)
+st.markdown(
+    f"<p style='font-size:1.25rem;margin-top:-8px;margin-bottom:32px;line-height:1.5'>"
+    f"Entre 2015 e 2025, o consumo da Irlanda subiu {fmt(d_total)} GWh; "
+    f"data centers responderam por <b style='color:{ACCENT}'>{fmt(d_dc)} GWh, "
+    f"{pct(pct_dc, 0)}% do total</b>. Hoje, eles são 23% de toda a eletricidade medida "
+    f"no país.</p>",
     unsafe_allow_html=True,
 )
+with st.expander("Público-alvo, demanda de informação e perguntas norteadoras"):
+    st.markdown("""
+**Público-alvo.** Gestor público municipal de cidade candidata a receber um
+data center, com poder sobre zoneamento, incentivo fiscal e contrapartidas.
+
+**Demanda de informação.** Entender o que a expansão de data centers fez com o
+sistema elétrico de um país que passou por ela antes, e onde o Brasil está
+nessa trajetória.
+
+**Questão central.** Quanto do crescimento do consumo elétrico da Irlanda entre
+2015 e 2025 foi explicado por data centers, e quanto por todo o resto do país?
+
+**Perguntas norteadoras**
+
+1. Quem explica o crescimento do consumo elétrico da Irlanda desde 2015?
+2. Em que nível a Irlanda estava quando surgiram restrições a novas conexões,
+   e quanto tempo levou para chegar lá?
+3. O ritmo de crescimento mudou depois da restrição?
+4. Por que o percentual trimestral não serve para acompanhar isso?
+5. Onde o Brasil está nessa trajetória?
+        """)
+
 st.divider()
 
 
 # ---------------------------------------------------------------------------
 # BLOCO 1  -  VISAO GERAL   (chunk 1)
 # ---------------------------------------------------------------------------
-st.subheader("1. A Irlanda em dez anos")
+st.subheader("O consumo energético na Irlanda na última década")
 
 bloco1 = st.container(border=True)
 with bloco1:
     c1, c2 = st.columns([3, 2])
 
 with c1:
-    st.markdown("**Quanto cada parte cresceu, ano a ano, desde 2015?**")
+    st.markdown("**Crescimento do consumo energético de 2015 a 2025**")
     # Crescimento ACUMULADO desde 2015, nao o nivel absoluto.
     # Duas series partindo de zero podem ter a inclinacao comparada direto.
     # No grafico de niveis, o cinza em 24.000 e o laranja em 1.200 estavam em
@@ -221,30 +249,34 @@ with c1:
     )
 
 with c2:
-    st.markdown("**O crescimento de 2015 a 2025, repartido**")
+    st.markdown(f"**Como os {fmt(d_total)} GWh de crescimento estão divididos**")
     contrib = pd.DataFrame(
         {
             "grupo": ["Data centers", "Todo o resto do país"],
             "delta": [d_dc, d_resto],
         }
     )
-    contrib["rotulo"] = contrib.delta.map(fmt)
+    contrib["rotulo"] = [
+        f"{fmt(v)} GWh  ({pct(v / d_total * 100, 0)}%)" for v in contrib.delta
+    ]
     g2 = (
         alt.Chart(contrib)
         .mark_bar(height=52)
         .encode(
+            # sort="-x" e ignorado quando o grafico tem camadas: o Vega cai em
+            # ordem alfabetica. Lista explicita e a unica forma confiavel aqui.
             y=alt.Y(
                 "grupo:N",
                 title=None,
-                sort="-x",
+                sort=alt.Sort(["Data centers", "Todo o resto do país"]),
                 axis=alt.Axis(labelLimit=260, grid=False),
             ),
             x=alt.X(
                 "delta:Q",
                 title="Crescimento em GWh",
                 axis=alt.Axis(grid=False, tickCount=4),
-                # folga de 18% para o rotulo do valor caber dentro da area
-                scale=alt.Scale(domain=[0, d_dc * 1.18]),
+                # folga para o rotulo (valor + participacao) caber na area
+                scale=alt.Scale(domain=[0, d_dc * 1.45]),
             ),
             color=alt.Color(
                 "grupo:N",
@@ -259,7 +291,7 @@ with c2:
                 alt.Tooltip("delta:Q", title="Crescimento (GWh)", format=","),
             ],
         )
-        .properties(height=ALTURA)
+        .properties(height=280)
     )
     val = g2.mark_text(
         align="left", dx=8, fontSize=F_VALOR, fontWeight="bold", color=ACCENT
@@ -267,7 +299,7 @@ with c2:
     st.altair_chart(base_eixos(g2 + val), use_container_width=True, theme=None)
     st.caption(
         f"Residências, indústria, comércio e todo o resto somados cresceram "
-        f"{d_resto / anual.resto.iloc[0] * 100:.0f}% em dez anos."
+        f"{pct(d_resto / anual.resto.iloc[0] * 100, 0)}% em dez anos."
     )
 
 
@@ -275,7 +307,7 @@ with c2:
 # BLOCO 2  -  A JANELA DE DECISAO   (chunk 2)
 # ---------------------------------------------------------------------------
 st.divider()
-st.subheader("2. Quanto tempo passou até a rede travar")
+st.subheader("Em 2021, o órgão regulador irlandês restringe novas conexões")
 
 bloco2 = st.container(border=True)
 with bloco2:
@@ -283,14 +315,13 @@ with bloco2:
 
 with c3:
     st.markdown(
-        "**Em que nível a Irlanda estava quando o regulador bloqueou "
-        "novas conexões, e quanto tempo levou para chegar lá?**"
+        "**O consumo elétrico dos data centers, antes e depois da restrição imposta pelo regulador**"
     )
     esc = alt.Scale(domain=[2014.6, 2025.4])
 
     banda = (
         alt.Chart(pd.DataFrame({"x": [2015], "x2": [ANO_BLOQUEIO]}))
-        .mark_rect(color=ACCENT, opacity=0.08)
+        .mark_rect(color=GRAY_DARK, opacity=0.07)
         .encode(x=alt.X("x:Q", scale=esc), x2="x2:Q")
     )
     linha = (
@@ -318,10 +349,14 @@ with c3:
     txt = (
         alt.Chart(
             pd.DataFrame(
-                {"x": [2018], "y": [anual.share.max() * 0.95], "t": ["6 anos"]}
+                {
+                    "x": [2018],
+                    "y": [anual.share.max() * 0.95],
+                    "t": ["6 anos: 2015 → 2021"],
+                }
             )
         )
-        .mark_text(fontSize=22, fontWeight="bold", color=ACCENT)
+        .mark_text(fontSize=22, fontWeight="bold", color=GRAY_DARK)
         .encode(x=alt.X("x:Q", scale=esc), y="y:Q", text="t:N")
     )
     txt2 = (
@@ -330,7 +365,7 @@ with c3:
                 {
                     "x": [ANO_BLOQUEIO],
                     "y": [anual.share.max() * 0.55],
-                    "t": ["Bloqueio de novas conexões (Dublin)"],
+                    "t": ["Restrição a novas conexões (Grande Dublin)"],
                 }
             )
         )
@@ -343,30 +378,26 @@ with c3:
         theme=None,
     )
     st.caption(
-        "Duas ressalvas. O bloqueio respondeu à capacidade da rede na Grande "
-        "Dublin; nenhum percentual nacional foi usado como gatilho. E os 6 anos "
+        "A restrição respondeu à capacidade da rede na Grande Dublin, e nenhum "
+        "percentual nacional foi usado como gatilho. Os 6 anos "
         "contam do início da série do CSO, que já pega a expansão em curso."
     )
 
 with c4:
     st.markdown("**O ritmo de crescimento ano a ano**")
     cr = anual.dropna(subset=["cresc_dc"]).copy()
-    cr["fase"] = (cr.ano >= ANO_BLOQUEIO).map(
-        {True: "Depois de 2021", False: "Antes de 2021"}
-    )
+    # Antes, laranja marcava "depois de 2021" e tambem significava data centers
+    # no resto do painel. Dois sentidos para a mesma cor. Agora so o ano da
+    # intervencao recebe destaque; a queda depois dele fica por conta da altura.
+    # Todas as barras medem a mesma coisa (crescimento dos data centers), entao
+    # todas recebem laranja. O ano da restricao e marcado por regra tracejada,
+    # que e "marcas adicionadas", nao por uma segunda cor.
     g4 = (
         alt.Chart(cr)
-        .mark_bar()
+        .mark_bar(color=ACCENT)
         .encode(
             x=alt.X("ano:O", title=None, axis=alt.Axis(labelAngle=0)),
             y=alt.Y("cresc_dc:Q", title="Crescimento anual dos data centers (%)"),
-            color=alt.Color(
-                "fase:N",
-                scale=alt.Scale(
-                    domain=["Antes de 2021", "Depois de 2021"], range=[GRAY_MID, ACCENT]
-                ),
-                legend=None,
-            ),
             tooltip=[
                 alt.Tooltip("ano:O", title="Ano"),
                 alt.Tooltip("cresc_dc:Q", title="Crescimento no ano (%)", format=".1f"),
@@ -374,27 +405,34 @@ with c4:
         )
         .properties(height=ALTURA)
     )
+    # O ano precisa ser int, igual ao do grafico. Passar "2022" como texto
+    # nao casa com o dominio ordinal e o Vega joga a anotacao no inicio do eixo.
     nota4 = (
         alt.Chart(
             pd.DataFrame(
                 {
-                    "ano": ["2022"],
-                    "y": [cr.cresc_dc.max() * 1.02],
-                    "t": ["← a partir do bloqueio de 2021"],
+                    "ano": [ANO_BLOQUEIO],
+                    "y": [cr.cresc_dc.max() * 1.04],
+                    "t": ["ano da restrição"],
                 }
             )
         )
         .mark_text(
-            align="left", dx=4, fontSize=F_ANOTACAO, fontWeight="bold", color=ACCENT
+            align="left", dx=6, fontSize=F_ANOTACAO, fontWeight="bold", color=GRAY_DARK
         )
         .encode(x=alt.X("ano:O"), y="y:Q", text="t:N")
     )
-    st.altair_chart(base_eixos(g4 + nota4), use_container_width=True, theme=None)
+    regra4 = (
+        alt.Chart(pd.DataFrame({"ano": [ANO_BLOQUEIO]}))
+        .mark_rule(color=GRAY_DARK, strokeDash=[6, 4], strokeWidth=2)
+        .encode(x=alt.X("ano:O"))
+    )
+    st.altair_chart(
+        base_eixos(g4 + regra4 + nota4), use_container_width=True, theme=None
+    )
     st.caption(
-        "O crescimento caiu de 32% para 10% ao ano, e seguiu positivo mesmo sob "
-        "moratória. A regulação atrasou a curva sem reverter. Vale ler como "
-        "coincidência no tempo: saturação de mercado e limite de rede explicariam "
-        "o mesmo padrão. [VERIFICAR status atual da moratória na CRU/EirGrid]"
+        "O crescimento caiu de 32% para 10% ao ano e seguiu positivo durante "
+        "todo o período de restrição. A regulação atrasou a curva sem reverter."
     )
 
 
@@ -402,16 +440,21 @@ with c4:
 # BLOCO 3  -  A ARMADILHA DO DADO   (chunk 3)
 # ---------------------------------------------------------------------------
 st.divider()
-st.subheader("3. Por que não usamos o percentual trimestral")
+st.subheader("A influência das estações do ano no consumo energético da Irlanda")
 
 bloco3 = st.container(border=True)
 with bloco3:
     st.markdown(
-        "**O consumo dos data centers varia conforme a estação do ano?**  "
-        "Quem varia é o consumo do país, que entra como denominador."
+        "**A variação do consumo geral do país e do consumo dos data centers "
+        "conforme a estação**"
     )
+# Rotulo legivel para o tooltip. "2015Q1" e notacao de planilha; no tooltip
+# cabe o nome por extenso, que e onde o leitor busca detalhe.
+MESES = {"Q1": "jan a mar", "Q2": "abr a jun", "Q3": "jul a set", "Q4": "out a dez"}
+df["periodo"] = [f"{r.quarter[:4]}, {MESES[r.quarter[-2:]]}" for r in df.itertuples()]
+
 q = df.melt(
-    id_vars="quarter",
+    id_vars=["quarter", "periodo"],
     value_vars=["data_center_consumption", "total_consumption"],
     var_name="serie",
     value_name="gwh",
@@ -421,65 +464,122 @@ q = df.melt(
         "total_consumption": "Consumo total do país",
     }
 )
-g5 = (
-    alt.Chart(q)
-    .mark_line(strokeWidth=2.5)
+# Dois paineis com escala Y propria, no lugar de duas linhas na mesma escala.
+# Na escala unica o laranja ficava esmagado no rodape: a legenda afirmava que ele
+# sobe reto, mas o leitor nao tinha como conferir. Agora da para ver o serrilhado
+# de uma curva contra a suavidade da outra.
+# Eixo com o ano por extenso, sem o sufixo de trimestre: a marca continua no
+# primeiro trimestre, mas o rotulo lido e so "2015", "2016"...
+EIXO_Q = alt.Axis(
+    labelAngle=0,
+    labelFontSize=F_EIXO,
+    values=[f"{a}Q1" for a in range(2015, 2026)],
+    labelExpr="replace(datum.label, 'Q1', '')",
+    title=None,
+)
+
+# Titulo so no painel de baixo, para nao repetir a mesma frase duas vezes.
+EIXO_Q_BASE = alt.Axis(
+    labelAngle=0,
+    labelFontSize=F_EIXO,
+    values=[f"{a}Q1" for a in range(2015, 2026)],
+    labelExpr="replace(datum.label, 'Q1', '')",
+    titleFontSize=13,
+)
+
+p_total = (
+    alt.Chart(q[q.serie == "Consumo total do país"])
+    .mark_line(
+        strokeWidth=2.5,
+        color=GRAY_MID,
+        point=alt.OverlayMarkDef(size=24, filled=True, color=GRAY_MID),
+    )
     .encode(
-        x=alt.X(
-            "quarter:O",
-            title=None,
-            axis=alt.Axis(
-                labelAngle=0,
-                labelFontSize=F_EIXO,
-                values=[f"{a}Q1" for a in range(2015, 2026)],
-            ),
-        ),
-        y=alt.Y("gwh:Q", title="GWh no trimestre"),
-        color=alt.Color(
-            "serie:N",
-            scale=alt.Scale(
-                domain=["Data centers", "Consumo total do país"],
-                range=[ACCENT, GRAY_MID],
-            ),
-            legend=None,
-        ),
+        x=alt.X("quarter:O", title=None, axis=EIXO_Q),
+        y=alt.Y("gwh:Q", title="Consumo do país", axis=alt.Axis(tickCount=4)),
         tooltip=[
-            alt.Tooltip("quarter:O", title="Trimestre"),
-            alt.Tooltip("serie:N", title=" "),
+            alt.Tooltip("periodo:N", title="Período"),
             alt.Tooltip("gwh:Q", title="GWh", format=","),
         ],
     )
-    .properties(height=ALTURA)
+    .properties(height=190)
 )
-# Rotulo direto em vez de legenda: o material critica legenda solta,
-# porque obriga o olho a ir e voltar para decodificar a cor.
-ult_q = q[q.quarter == q.quarter.max()]
-rot5 = (
-    alt.Chart(ult_q)
-    .mark_text(align="right", dx=-6, dy=-16, fontSize=F_ROTULO, fontWeight="bold")
-    .encode(
-        x=alt.X("quarter:O"),
-        y="gwh:Q",
-        text="serie:N",
-        color=alt.Color(
-            "serie:N",
-            scale=alt.Scale(
-                domain=["Data centers", "Consumo total do país"],
-                range=[ACCENT, GRAY_DARK],
-            ),
-            legend=None,
-        ),
+
+p_dc = (
+    alt.Chart(q[q.serie == "Data centers"])
+    .mark_line(
+        strokeWidth=3,
+        color=ACCENT,
+        point=alt.OverlayMarkDef(size=24, filled=True, color=ACCENT),
     )
+    .encode(
+        x=alt.X("quarter:O", title=None, axis=EIXO_Q_BASE),
+        y=alt.Y("gwh:Q", title="Data centers", axis=alt.Axis(tickCount=4)),
+        tooltip=[
+            alt.Tooltip("periodo:N", title="Período"),
+            alt.Tooltip("gwh:Q", title="GWh", format=","),
+        ],
+    )
+    .properties(height=190)
 )
+
+# Anotacoes no PRIMEIRO ciclo da serie, que e onde o olho comeca a ler, e nao
+# no meio do grafico. Cada rotulo vem acompanhado de um ponto destacado: sem o
+# ponto, o texto flutua e o leitor nao sabe a que ele se refere.
+_marcas = pd.DataFrame(
+    [
+        {
+            "quarter": "2015Q1",
+            "gwh": int(df.loc[df.quarter == "2015Q1", "total_consumption"].iloc[0]),
+            "t": "inverno",
+            "dy": -18,
+        },
+        {
+            "quarter": "2015Q3",
+            "gwh": int(df.loc[df.quarter == "2015Q3", "total_consumption"].iloc[0]),
+            "t": "verão",
+            "dy": 22,
+        },
+    ]
+)
+
+pontos_marca = (
+    alt.Chart(_marcas)
+    .mark_point(size=140, filled=True, color=INK, opacity=1)
+    .encode(x=alt.X("quarter:O"), y="gwh:Q")
+)
+
+
+# dy e propriedade de mark, nao canal de encoding: por isso duas marcas
+# separadas, uma acima do pico e outra abaixo do vale.
+def _rotulo(trimestre, deslocamento):
+    return (
+        alt.Chart(_marcas[_marcas.quarter == trimestre])
+        .mark_text(
+            align="left",
+            dx=10,
+            dy=deslocamento,
+            fontSize=F_ANOTACAO,
+            fontWeight="bold",
+            color=INK,
+        )
+        .encode(x=alt.X("quarter:O"), y="gwh:Q", text="t:N")
+    )
+
+
+rotulos_marca = _rotulo("2015Q1", -18) + _rotulo("2015Q3", 22)
+
+g5 = alt.vconcat(p_total + pontos_marca + rotulos_marca, p_dc, spacing=10)
+
 with bloco3:
-    st.altair_chart(base_eixos(g5 + rot5), use_container_width=True, theme=None)
+    st.altair_chart(base_eixos(g5), use_container_width=True, theme=None)
     st.caption(
-        "A linha cinza sobe e desce com aquecimento e iluminação. A laranja sobe "
-        "quase reto. O resultado é que o percentual trimestral vai de "
-        f"{df[df.ano == 2024].consumption_usage.min():.1f}% a "
-        f"{df[df.ano == 2024].consumption_usage.max():.1f}% dentro de 2024 sem que "
-        "nada tenha mudado nos data centers. Por isso o percentual aparece aqui "
-        "sempre em base anual."
+        "Cada painel tem escala própria, para dar para ver o formato das duas curvas. "
+        "Em cima o consumo do país sobe e desce a cada estação; embaixo os data "
+        "centers sobem quase reto. O percentual trimestral vai de "
+        f"{pct(df[df.ano == 2024].consumption_usage.min())}% a "
+        f"{pct(df[df.ano == 2024].consumption_usage.max())}% dentro de 2024 sem que "
+        "nada tenha mudado nos data centers."
     )
 
 
@@ -487,7 +587,7 @@ with bloco3:
 # BLOCO 4  -  ONDE O BRASIL ESTA   (chunk 4)
 # ---------------------------------------------------------------------------
 st.divider()
-st.subheader("4. O Brasil na mesma curva")
+st.subheader("A trajetória do Brasil")
 
 bloco4 = st.container(border=True)
 with bloco4:
@@ -497,30 +597,49 @@ with c5:
     st.metric(
         "Data centers no consumo elétrico do Brasil, 2024",
         "1,7%",
-        help="Fonte: Brasscom, associação das empresas do setor. "
-        "[VERIFICAR no estudo original]",
+        help="Fonte: Brasscom, associação das empresas de TIC. Como é "
+        "parte interessada, o número aparece aqui sempre identificado. "
+        "Não foi possível conferir no estudo original.",
     )
     st.markdown(
-        f"<p style='opacity:.75;font-size:1rem'>É menos que o ponto de partida "
-        f"da série irlandesa, que abre em {anual.share.iloc[0]:.1f}% no ano de "
-        f"2015. A comparação tem limite: o dado irlandês vem do instituto oficial "
-        f"de estatística e o brasileiro, de um levantamento da associação das "
-        f"empresas do setor.</p>",
+        f"<p style='font-size:1.05rem;line-height:1.5'>O Brasil está hoje "
+        f"<b>abaixo do ponto onde a série irlandesa começa</b>: "
+        f"{pct(anual.share.iloc[0])}% em 2015, contra 1,7% aqui. Em termos de "
+        f"trajetória, é o início da curva.</p>",
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Fontes: Central Statistics Office, instituto oficial de estatística da "
+        "Irlanda, e levantamento da Brasscom no Brasil."
+    )
+    st.markdown(
+        f"<p style='opacity:.75;font-size:.95rem;margin-top:12px'>Cerca de 97% "
+        f"dos data centers irlandeses ficam na região de Dublin, onde respondem "
+        f"por volta de 50% da demanda elétrica regional.</p>",
         unsafe_allow_html=True,
     )
 
 with c6:
-    st.markdown("**Pedidos de conexão e capacidade instalada, em MW**")
+    st.markdown(
+        "**A evolução dos pedidos de conexão de data centers no Brasil, em comparação ao consumo energético total do país**"
+    )
+    # Comparacao anterior (pedidos x capacidade instalada) misturava unidades:
+    # pedido de conexao e potencia na rede, capacidade instalada e carga de TI.
+    # Alem disso a capacidade instalada nao tem valor consensual: as fontes
+    # levantadas iam de 481 a 950 MW conforme ano e metodologia.
+    # Pico do sistema e pedido de conexao sao ambos potencia na rede, em GW.
     br = pd.DataFrame(
         {
-            "situacao": ["Pedidos de conexão à rede", "Capacidade já instalada"],
-            "mw": [
-                26200,
-                800,
-            ],  # [VERIFICAR] EPE, nov/2025 - Caderno de Transmissao PDE 2035
+            "situacao": [
+                "Pico máximo de consumo do país (fev/2025)",
+                "Pedidos de conexão de data centers (nov/2025)",
+            ],
+            "gw": [105.0, 26.2],
         }
     )
-    br["rotulo"] = br.mw.map(fmt)
+    br["rotulo"] = [f"{pct(v)} GW" for v in br.gw]
+    fatia = br.gw.iloc[1] / br.gw.iloc[0] * 100
+
     g6 = (
         alt.Chart(br)
         .mark_bar(height=56)
@@ -528,40 +647,63 @@ with c6:
             y=alt.Y(
                 "situacao:N",
                 title=None,
-                sort="-x",
-                axis=alt.Axis(labelLimit=260, grid=False),
+                sort=alt.Sort(
+                    [
+                        "Pico máximo de consumo do país (fev/2025)",
+                        "Pedidos de conexão de data centers (nov/2025)",
+                    ]
+                ),
+                axis=alt.Axis(labelLimit=320, grid=False),
             ),
             x=alt.X(
-                "mw:Q",
-                title="MW",
+                "gw:Q",
+                title="GW",
                 axis=alt.Axis(grid=False, tickCount=4),
-                scale=alt.Scale(domain=[0, 26200 * 1.18]),
+                scale=alt.Scale(domain=[0, 105 * 1.18]),
             ),
             color=alt.Color(
                 "situacao:N",
                 scale=alt.Scale(
-                    domain=["Pedidos de conexão à rede", "Capacidade já instalada"],
-                    range=[ACCENT, GRAY_MID],
+                    domain=[
+                        "Pico máximo de consumo do país (fev/2025)",
+                        "Pedidos de conexão de data centers (nov/2025)",
+                    ],
+                    range=[GRAY_MID, ACCENT],
                 ),
                 legend=None,
             ),
             tooltip=[
                 alt.Tooltip("situacao:N", title=" "),
-                alt.Tooltip("mw:Q", title="MW", format=","),
+                alt.Tooltip("gw:Q", title="GW", format=","),
             ],
         )
         .properties(height=260)
     )
-    lbl = g6.mark_text(
-        align="left", dx=8, fontSize=F_VALOR, fontWeight="bold", color=ACCENT
-    ).encode(text="rotulo:N")
+    lbl = g6.mark_text(align="left", dx=8, fontSize=F_VALOR, fontWeight="bold").encode(
+        text="rotulo:N",
+        color=alt.Color(
+            "situacao:N",
+            scale=alt.Scale(
+                domain=[
+                    "Pico máximo de consumo do país (fev/2025)",
+                    "Pedidos de conexão de data centers (nov/2025)",
+                ],
+                range=[GRAY_DARK, ACCENT],
+            ),
+            legend=None,
+        ),
+    )
     st.altair_chart(base_eixos(g6 + lbl), use_container_width=True, theme=None)
     st.caption(
-        "Fonte: EPE, nov/2025. [VERIFICAR no Caderno de Transmissão do PDE 2035]"
+        f"Os pedidos equivalem a {pct(fatia, 0)}% do maior pico de consumo já "
+        "registrado no Brasil, e a fila cresce rápido: eram 19,8 GW em "
+        "setembro de 2025 e passaram a 26,2 GW em novembro, um acréscimo de "
+        "6,4 GW em pouco mais de 60 dias."
     )
 
 st.divider()
 st.caption(
-    "Irlanda: Central Statistics Office. Brasil: EPE e Brasscom. "
-    "Série de 2015 a 2025 para a Irlanda; dado brasileiro de 2024 e 2025."
+    "Irlanda: Central Statistics Office (série 2015 a 2025) e Commission for "
+    "Regulation of Utilities. Brasil: EPE (pedidos de conexão, nov/2025) e "
+    "Brasscom (participação no consumo, 2024)."
 )
