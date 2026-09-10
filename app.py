@@ -49,6 +49,11 @@ def fmt(n):
     return f"{int(n):,}".replace(",", ".")
 
 
+def gw(v):
+    """Potencia em pt-BR, sem decimal desnecessario: 105.0 -> "105", 26.2 -> "26,2" """
+    return f"{v:.0f}" if float(v).is_integer() else f"{v:.1f}".replace(".", ",")
+
+
 def pct(x, casas=1):
     """Decimal em pt-BR: 19.9 -> 19,9"""
     return f"{x:.{casas}f}".replace(".", ",")
@@ -307,7 +312,7 @@ with c2:
 # BLOCO 2  -  A JANELA DE DECISAO   (chunk 2)
 # ---------------------------------------------------------------------------
 st.divider()
-st.subheader("Em 2021, o órgão regulador irlandês restringe novas conexões")
+st.subheader("Em 2021, o regulador irlandês restringe novas conexões")
 
 bloco2 = st.container(border=True)
 with bloco2:
@@ -446,7 +451,8 @@ bloco3 = st.container(border=True)
 with bloco3:
     st.markdown(
         "**A variação do consumo geral do país e do consumo dos data centers "
-        "conforme a estação**"
+        "conforme a estação**  \nCada ano tem quatro pontos, um por trimestre. "
+        "Na Irlanda, o pico é no inverno e o vale no verão."
     )
 # Rotulo legivel para o tooltip. "2015Q1" e notacao de planilha; no tooltip
 # cabe o nome por extenso, que e onde o leitor busca detalhe.
@@ -484,14 +490,14 @@ EIXO_Q_BASE = alt.Axis(
     labelFontSize=F_EIXO,
     values=[f"{a}Q1" for a in range(2015, 2026)],
     labelExpr="replace(datum.label, 'Q1', '')",
+    title="cada ponto é um trimestre",
     titleFontSize=13,
 )
 
 p_total = (
     alt.Chart(q[q.serie == "Consumo total do país"])
     .mark_line(
-        strokeWidth=2.5,
-        color=GRAY_MID,
+        strokeWidth=2.5, color=GRAY_MID,
         point=alt.OverlayMarkDef(size=24, filled=True, color=GRAY_MID),
     )
     .encode(
@@ -508,8 +514,7 @@ p_total = (
 p_dc = (
     alt.Chart(q[q.serie == "Data centers"])
     .mark_line(
-        strokeWidth=3,
-        color=ACCENT,
+        strokeWidth=3, color=ACCENT,
         point=alt.OverlayMarkDef(size=24, filled=True, color=ACCENT),
     )
     .encode(
@@ -528,18 +533,12 @@ p_dc = (
 # ponto, o texto flutua e o leitor nao sabe a que ele se refere.
 _marcas = pd.DataFrame(
     [
-        {
-            "quarter": "2015Q1",
-            "gwh": int(df.loc[df.quarter == "2015Q1", "total_consumption"].iloc[0]),
-            "t": "inverno",
-            "dy": -18,
-        },
-        {
-            "quarter": "2015Q3",
-            "gwh": int(df.loc[df.quarter == "2015Q3", "total_consumption"].iloc[0]),
-            "t": "verão",
-            "dy": 22,
-        },
+        {"quarter": "2015Q1", "gwh": int(df.loc[df.quarter == "2015Q1",
+                                                "total_consumption"].iloc[0]),
+         "t": "inverno", "dy": -18},
+        {"quarter": "2015Q3", "gwh": int(df.loc[df.quarter == "2015Q3",
+                                                "total_consumption"].iloc[0]),
+         "t": "verão", "dy": 22},
     ]
 )
 
@@ -548,20 +547,14 @@ pontos_marca = (
     .mark_point(size=140, filled=True, color=INK, opacity=1)
     .encode(x=alt.X("quarter:O"), y="gwh:Q")
 )
-
-
 # dy e propriedade de mark, nao canal de encoding: por isso duas marcas
 # separadas, uma acima do pico e outra abaixo do vale.
 def _rotulo(trimestre, deslocamento):
     return (
         alt.Chart(_marcas[_marcas.quarter == trimestre])
         .mark_text(
-            align="left",
-            dx=10,
-            dy=deslocamento,
-            fontSize=F_ANOTACAO,
-            fontWeight="bold",
-            color=INK,
+            align="left", dx=10, dy=deslocamento,
+            fontSize=F_ANOTACAO, fontWeight="bold", color=INK,
         )
         .encode(x=alt.X("quarter:O"), y="gwh:Q", text="t:N")
     )
@@ -569,10 +562,16 @@ def _rotulo(trimestre, deslocamento):
 
 rotulos_marca = _rotulo("2015Q1", -18) + _rotulo("2015Q3", 22)
 
-g5 = alt.vconcat(p_total + pontos_marca + rotulos_marca, p_dc, spacing=10)
+# Nada de vconcat aqui: largura responsiva nao se aplica a vistas concatenadas,
+# entao o grafico estourava a borda do card. Dois graficos independentes, cada um
+# com use_container_width, ficam do tamanho certo. Visualmente sao dois paineis
+# empilhados do mesmo jeito.
+g5_topo = p_total + pontos_marca + rotulos_marca
+g5_base = p_dc
 
 with bloco3:
-    st.altair_chart(base_eixos(g5), use_container_width=True, theme=None)
+    st.altair_chart(base_eixos(g5_topo), use_container_width=True, theme=None)
+    st.altair_chart(base_eixos(g5_base), use_container_width=True, theme=None)
     st.caption(
         "Cada painel tem escala própria, para dar para ver o formato das duas curvas. "
         "Em cima o consumo do país sobe e desce a cada estação; embaixo os data "
@@ -637,7 +636,7 @@ with c6:
             "gw": [105.0, 26.2],
         }
     )
-    br["rotulo"] = [f"{pct(v)} GW" for v in br.gw]
+    br["rotulo"] = [f"{gw(v)} GW" for v in br.gw]
     fatia = br.gw.iloc[1] / br.gw.iloc[0] * 100
 
     g6 = (
