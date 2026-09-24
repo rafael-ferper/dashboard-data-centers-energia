@@ -140,7 +140,7 @@ def base_eixos(chart):
 # Sem cor de texto fixa: quem define e o tema. So o destaque laranja e fixo,
 # porque laranja tem contraste suficiente em fundo claro e escuro.
 st.markdown(
-    "## A evolução do consumo energético frente ao crescimento dos data centers, um comparativo entre Irlanda e Brasil"
+    "## Data centers e consumo elétrico: a experiência da Irlanda e o ponto de partida do Brasil"
 )
 st.markdown(
     f"<p style='font-size:1.25rem;margin-top:-8px;margin-bottom:32px;line-height:1.5'>"
@@ -248,10 +248,7 @@ with c1:
     )
 
     st.altair_chart(base_eixos(g1 + rot), use_container_width=True, theme=None)
-    st.caption(
-        "As duas partem de zero em 2015, então a inclinação pode ser comparada "
-        "direto. Fonte: CSO Irlanda, Data Centres Metered Electricity Consumption."
-    )
+    st.caption("Fonte: CSO Irlanda, Data Centres Metered Electricity Consumption.")
 
 with c2:
     st.markdown(f"**Como os {fmt(d_total)} GWh de crescimento estão divididos**")
@@ -302,10 +299,6 @@ with c2:
         align="left", dx=8, fontSize=F_VALOR, fontWeight="bold", color=ACCENT
     ).encode(text="rotulo:N")
     st.altair_chart(base_eixos(g2 + val), use_container_width=True, theme=None)
-    st.caption(
-        f"Residências, indústria, comércio e todo o resto somados cresceram "
-        f"{pct(d_resto / anual.resto.iloc[0] * 100, 0)}% em dez anos."
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -382,11 +375,7 @@ with c3:
         use_container_width=True,
         theme=None,
     )
-    st.caption(
-        "A restrição respondeu à capacidade da rede na Grande Dublin, e nenhum "
-        "percentual nacional foi usado como gatilho. Os 6 anos "
-        "contam do início da série do CSO, que já pega a expansão em curso."
-    )
+    st.caption("Fonte: CSO Irlanda, Data Centres Metered Electricity Consumption.")
 
 with c4:
     st.markdown("**O ritmo de crescimento ano a ano**")
@@ -434,10 +423,6 @@ with c4:
     )
     st.altair_chart(
         base_eixos(g4 + regra4 + nota4), use_container_width=True, theme=None
-    )
-    st.caption(
-        "O crescimento caiu de 32% para 10% ao ano e seguiu positivo durante "
-        "todo o período de restrição. A regulação atrasou a curva sem reverter."
     )
 
 
@@ -572,14 +557,7 @@ g5_base = p_dc
 with bloco3:
     st.altair_chart(base_eixos(g5_topo), use_container_width=True, theme=None)
     st.altair_chart(base_eixos(g5_base), use_container_width=True, theme=None)
-    st.caption(
-        "Cada painel tem escala própria, para dar para ver o formato das duas curvas. "
-        "Em cima o consumo do país sobe e desce a cada estação; embaixo os data "
-        "centers sobem quase reto. O percentual trimestral vai de "
-        f"{pct(df[df.ano == 2024].consumption_usage.min())}% a "
-        f"{pct(df[df.ano == 2024].consumption_usage.max())}% dentro de 2024 sem que "
-        "nada tenha mudado nos data centers."
-    )
+    st.caption("Fonte: CSO Irlanda, Data Centres Metered Electricity Consumption.")
 
 
 # ---------------------------------------------------------------------------
@@ -593,112 +571,148 @@ with bloco4:
     c5, c6 = st.columns([2, 3])
 
 with c5:
-    st.metric(
-        "Data centers no consumo elétrico do Brasil, 2024",
-        "1,7%",
-        help="Fonte: Brasscom, associação das empresas de TIC. Como é "
-        "parte interessada, o número aparece aqui sempre identificado. "
-        "Não foi possível conferir no estudo original.",
+    st.markdown("**Parcela do consumo elétrico que vai para data centers**")
+    # O 1,7% sozinho nao diz nada. Posto contra a curva irlandesa, ele mostra
+    # a posicao do Brasil: abaixo do ponto onde a serie da Irlanda comeca.
+    # Laranja no Brasil, que e a resposta deste grafico; Irlanda e contexto.
+    BR_SHARE = 1.7  # Brasscom, 2024 (parte interessada, identificada na fonte)
+    esc6 = alt.Scale(domain=[2014.6, 2026.2])
+
+    irl = (
+        alt.Chart(anual)
+        .mark_line(
+            strokeWidth=3, color=GRAY_MID,
+            point=alt.OverlayMarkDef(size=40, filled=True, color=GRAY_MID),
+        )
+        .encode(
+            x=alt.X(
+                "ano:Q",
+                title=None,
+                scale=esc6,
+                axis=alt.Axis(format="d", values=[2015, 2020, 2025]),
+            ),
+            y=alt.Y(
+                "share:Q",
+                title="% do consumo elétrico",
+                scale=alt.Scale(domain=[0, anual.share.max() * 1.15]),
+                axis=alt.Axis(tickCount=5),
+            ),
+            tooltip=[
+                alt.Tooltip("ano:Q", title="Irlanda", format="d"),
+                alt.Tooltip("share:Q", title="% do consumo", format=".1f"),
+            ],
+        )
     )
-    st.markdown(
-        f"<p style='font-size:1.05rem;line-height:1.5'>O Brasil está hoje "
-        f"<b>abaixo do ponto onde a série irlandesa começa</b>: "
-        f"{pct(anual.share.iloc[0])}% em 2015, contra 1,7% aqui. Em termos de "
-        f"trajetória, é o início da curva.</p>",
-        unsafe_allow_html=True,
+    ext_irl = anual.iloc[[0, -1]].copy()
+    ext_irl["t"] = [
+        f"Irlanda 2015: {pct(ext_irl.share.iloc[0])}%",
+        f"Irlanda 2025: {pct(ext_irl.share.iloc[1])}%",
+    ]
+    # Primeira etiqueta alinha pela esquerda, ultima pela direita: nenhuma
+    # das duas sai da area do grafico.
+    # A de 2015 vai abaixo do ponto, porque acima dela a linha ja sobe.
+    def _rot_irl(linha, alinhamento, desloc):
+        return (
+            alt.Chart(ext_irl.iloc[[linha]])
+            .mark_text(align=alinhamento, dy=desloc, fontSize=F_ANOTACAO,
+                       fontWeight="bold", color=GRAY_DARK)
+            .encode(x=alt.X("ano:Q", scale=esc6), y="share:Q", text="t:N")
+        )
+
+    rot_irl = _rot_irl(0, "left", 20) + _rot_irl(1, "right", -18)
+
+    br_df = pd.DataFrame({"x": [2015], "x2": [2025], "y": [BR_SHARE],
+                          "t": [f"Brasil hoje: {pct(BR_SHARE)}%"]})
+    br_linha = (
+        alt.Chart(br_df)
+        .mark_rule(color=ACCENT, strokeWidth=3.5, strokeDash=[8, 5])
+        .encode(x=alt.X("x:Q", scale=esc6), x2="x2:Q", y="y:Q",
+                tooltip=[alt.Tooltip("t:N", title="Brasscom, 2024")])
+    )
+    # Rotulo na ponta direita, onde a area abaixo da curva irlandesa esta vazia.
+    br_rot = (
+        alt.Chart(br_df)
+        .mark_text(align="right", dy=-16, fontSize=F_ROTULO, fontWeight="bold",
+                   color=ACCENT)
+        .encode(x=alt.X("x2:Q", scale=esc6), y="y:Q", text="t:N")
+    )
+
+    st.altair_chart(
+        base_eixos((irl + rot_irl + br_linha + br_rot).properties(height=ALTURA)),
+        use_container_width=True,
+        theme=None,
     )
     st.caption(
-        "Fontes: Central Statistics Office, instituto oficial de estatística da "
-        "Irlanda, e levantamento da Brasscom no Brasil."
-    )
-    st.markdown(
-        f"<p style='opacity:.75;font-size:.95rem;margin-top:12px'>Cerca de 97% "
-        f"dos data centers irlandeses ficam na região de Dublin, onde respondem "
-        f"por volta de 50% da demanda elétrica regional.</p>",
-        unsafe_allow_html=True,
+        "Fontes: CSO Irlanda; Brasscom (associação do setor de TIC), Brasil 2024."
     )
 
 with c6:
     st.markdown(
-        "**A evolução dos pedidos de conexão de data centers no Brasil, em comparação ao consumo energético total do país**"
+        "**Pedidos de conexão de data centers frente ao maior pico de consumo do Brasil**"
     )
     # Comparacao anterior (pedidos x capacidade instalada) misturava unidades:
     # pedido de conexao e potencia na rede, capacidade instalada e carga de TI.
-    # Alem disso a capacidade instalada nao tem valor consensual: as fontes
-    # levantadas iam de 481 a 950 MW conforme ano e metodologia.
     # Pico do sistema e pedido de conexao sao ambos potencia na rede, em GW.
-    br = pd.DataFrame(
-        {
-            "situacao": [
-                "Pico máximo de consumo do país (fev/2025)",
-                "Pedidos de conexão de data centers (nov/2025)",
-            ],
-            "gw": [105.0, 26.2],
-        }
-    )
-    br["rotulo"] = [f"{gw(v)} GW" for v in br.gw]
-    fatia = br.gw.iloc[1] / br.gw.iloc[0] * 100
+    #
+    # A mensagem e "os pedidos valem um quarto do pico". Duas barras lado a lado
+    # obrigam o leitor a estimar a razao; com o pico ja recortado em 4 blocos
+    # iguais, o bloco laranja se encaixa no primeiro e a razao fica evidente.
+    PICO, PEDIDOS = 105.0, 26.2
+    PICO_ROT = "Pico histórico do Brasil (fev/2025)"
+    PED_ROT = "Pedidos de conexão de data centers (nov/2025)"
+    ORDEM6 = [PICO_ROT, PED_ROT]
+    quarto = PICO / 4
 
+    blocos = pd.DataFrame(
+        [{"linha": PICO_ROT, "x": i * quarto, "x2": (i + 1) * quarto,
+          "gw": PICO, "cor": "pico"} for i in range(4)]
+        + [{"linha": PED_ROT, "x": 0.0, "x2": PEDIDOS, "gw": PEDIDOS, "cor": "ped"}]
+    )
+    esc_x6 = alt.Scale(domain=[0, PICO * 1.22])
+    cor6 = alt.Scale(domain=["pico", "ped"], range=[GRAY_MID, ACCENT])
+    y6 = alt.Y("linha:N", title=None, sort=ORDEM6,
+               axis=alt.Axis(labelLimit=340, grid=False, domain=False, ticks=False))
+
+    # Borda branca grossa separa os quartos sem precisar de linha de grade.
     g6 = (
-        alt.Chart(br)
-        .mark_bar(height=56)
+        alt.Chart(blocos)
+        .mark_bar(height=64, stroke="white", strokeWidth=5)
         .encode(
-            y=alt.Y(
-                "situacao:N",
-                title=None,
-                sort=alt.Sort(
-                    [
-                        "Pico máximo de consumo do país (fev/2025)",
-                        "Pedidos de conexão de data centers (nov/2025)",
-                    ]
-                ),
-                axis=alt.Axis(labelLimit=320, grid=False),
-            ),
-            x=alt.X(
-                "gw:Q",
-                title="GW",
-                axis=alt.Axis(grid=False, tickCount=4),
-                scale=alt.Scale(domain=[0, 105 * 1.18]),
-            ),
-            color=alt.Color(
-                "situacao:N",
-                scale=alt.Scale(
-                    domain=[
-                        "Pico máximo de consumo do país (fev/2025)",
-                        "Pedidos de conexão de data centers (nov/2025)",
-                    ],
-                    range=[GRAY_MID, ACCENT],
-                ),
-                legend=None,
-            ),
+            y=y6,
+            x=alt.X("x:Q", scale=esc_x6, axis=None),
+            x2="x2:Q",
+            color=alt.Color("cor:N", scale=cor6, legend=None),
             tooltip=[
-                alt.Tooltip("situacao:N", title=" "),
-                alt.Tooltip("gw:Q", title="GW", format=","),
+                alt.Tooltip("linha:N", title=" "),
+                alt.Tooltip("gw:Q", title="GW", format=",.1f"),
             ],
         )
         .properties(height=260)
     )
-    lbl = g6.mark_text(align="left", dx=8, fontSize=F_VALOR, fontWeight="bold").encode(
-        text="rotulo:N",
-        color=alt.Color(
-            "situacao:N",
-            scale=alt.Scale(
-                domain=[
-                    "Pico máximo de consumo do país (fev/2025)",
-                    "Pedidos de conexão de data centers (nov/2025)",
-                ],
-                range=[GRAY_DARK, ACCENT],
-            ),
-            legend=None,
-        ),
+
+    val6 = pd.DataFrame({"linha": ORDEM6, "x": [PICO, PEDIDOS],
+                         "t": [f"{gw(PICO)} GW", f"{gw(PEDIDOS)} GW"],
+                         "cor_txt": ["pico", "ped"]})
+    lbl = (
+        alt.Chart(val6)
+        .mark_text(align="left", dx=10, fontSize=F_VALOR, fontWeight="bold")
+        .encode(
+            y=y6,
+            x=alt.X("x:Q", scale=esc_x6),
+            text="t:N",
+            color=alt.Color("cor_txt:N", legend=None,
+                            scale=alt.Scale(domain=["pico", "ped"],
+                                            range=[GRAY_DARK, ACCENT])),
+        )
     )
-    st.altair_chart(base_eixos(g6 + lbl), use_container_width=True, theme=None)
-    st.caption(
-        f"Os pedidos equivalem a {pct(fatia, 0)}% do maior pico de consumo já "
-        "registrado no Brasil, e a fila cresce rápido: eram 19,8 GW em "
-        "setembro de 2025 e passaram a 26,2 GW em novembro, um acréscimo de "
-        "6,4 GW em pouco mais de 60 dias."
+    # Em camadas o Vega compartilha a escala de cor por padrao: sem o resolve,
+    # o texto herdaria o cinza claro das barras.
+    st.altair_chart(
+        base_eixos((g6 + lbl).resolve_scale(color="independent")),
+        use_container_width=True,
+        theme=None,
     )
+    st.caption("Fonte: EPE (pedidos de conexão, nov/2025; pico de demanda, PDE 2035).")
 
 st.divider()
 st.caption(
