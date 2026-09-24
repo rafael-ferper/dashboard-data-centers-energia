@@ -332,7 +332,11 @@ with c3:
                 scale=esc,
                 axis=alt.Axis(format="d", values=list(range(2015, 2026, 2))),
             ),
-            y=alt.Y("share:Q", title="% do consumo elétrico medido"),
+            y=alt.Y(
+                "share:Q",
+                title="% do consumo elétrico medido",
+                axis=alt.Axis(tickCount=5),
+            ),
             tooltip=[
                 alt.Tooltip("ano:Q", title="Ano", format="d"),
                 alt.Tooltip("share:Q", title="% do consumo", format=".1f"),
@@ -354,7 +358,9 @@ with c3:
                 }
             )
         )
-        .mark_text(fontSize=22, fontWeight="bold", color=GRAY_DARK)
+        # Mesmo tamanho das outras anotacoes: a faixa cinza ja marca o periodo,
+        # o texto so nomeia. Em 22px ele competia com a propria curva.
+        .mark_text(fontSize=F_ANOTACAO, fontWeight="bold", color=GRAY_DARK)
         .encode(x=alt.X("x:Q", scale=esc), y="y:Q", text="t:N")
     )
     txt2 = (
@@ -362,11 +368,13 @@ with c3:
             pd.DataFrame(
                 {
                     "x": [ANO_BLOQUEIO],
-                    "y": [anual.share.max() * 0.55],
-                    "t": ["Restrição a novas conexões (Grande Dublin)"],
+                    "y": [anual.share.max() * 0.2],
+                    "t": [["Restrição a novas", "conexões (Grande Dublin)"]],
                 }
             )
         )
+        # Em uma linha so, o texto passava da borda e era cortado. Quebrado em
+        # duas, cabe na area vazia a direita da marca e abaixo da curva.
         .mark_text(fontSize=F_ANOTACAO, align="left", dx=8, color=GRAY_DARK)
         .encode(x=alt.X("x:Q", scale=esc), y="y:Q", text="t:N")
     )
@@ -380,16 +388,20 @@ with c3:
 with c4:
     st.markdown("**O ritmo de crescimento ano a ano**")
     cr = anual.dropna(subset=["cresc_dc"]).copy()
-    # Antes, laranja marcava "depois de 2021" e tambem significava data centers
-    # no resto do painel. Dois sentidos para a mesma cor. Agora so o ano da
-    # intervencao recebe destaque; a queda depois dele fica por conta da altura.
-    # Todas as barras medem a mesma coisa (crescimento dos data centers), entao
-    # todas recebem laranja. O ano da restricao e marcado por regra tracejada,
-    # que e "marcas adicionadas", nao por uma segunda cor.
+    # Regra da cor: laranja so na resposta. A pergunta e o que aconteceu com o
+    # ritmo DEPOIS da restricao, entao so esses anos ficam laranja. Com as 10
+    # barras laranja, este era o elemento mais pesado do painel e nada nele
+    # se destacava.
+    cr["fase"] = ["depois" if a > ANO_BLOQUEIO else "antes" for a in cr.ano]
     g4 = (
         alt.Chart(cr)
-        .mark_bar(color=ACCENT)
+        .mark_bar()
         .encode(
+            color=alt.Color(
+                "fase:N",
+                scale=alt.Scale(domain=["antes", "depois"], range=[GRAY_MID, ACCENT]),
+                legend=None,
+            ),
             x=alt.X("ano:O", title=None, axis=alt.Axis(labelAngle=0)),
             y=alt.Y("cresc_dc:Q", title="Crescimento anual dos data centers (%)"),
             tooltip=[
