@@ -258,8 +258,12 @@ with c2:
             "delta": [d_dc, d_resto],
         }
     )
+    # Percentual so na barra laranja, que e a resposta. O "23%" da barra cinza
+    # colidia com o "23%" da abertura (parcela dos data centers hoje), com
+    # sentido diferente; e o leitor deduz o complemento dos 77% sozinho.
     contrib["rotulo"] = [
-        f"{fmt(v)} GWh  ({pct(v / d_total * 100, 0)}%)" for v in contrib.delta
+        f"{fmt(d_dc)} GWh  ({pct(pct_dc, 0)}%)",
+        f"{fmt(d_resto)} GWh",
     ]
     g2 = (
         alt.Chart(contrib)
@@ -586,15 +590,19 @@ with c5:
     st.markdown("**Parcela do consumo elétrico que vai para data centers**")
     # O 1,7% sozinho nao diz nada. Posto contra a curva irlandesa, ele mostra
     # a posicao do Brasil: abaixo do ponto onde a serie da Irlanda comeca.
-    # Laranja no Brasil, que e a resposta deste grafico; Irlanda e contexto.
+    # O matiz diz o assunto, a intensidade diz a importancia. A curva irlandesa
+    # e a mesma do bloco 2 (laranja la); em cinza aqui, parecia outra serie.
+    # Laranja claro mantem "data centers" e deixa o laranja forte para o Brasil,
+    # que e a resposta deste grafico. Rotulos da Irlanda seguem em cinza escuro:
+    # texto no laranja claro nao tem contraste suficiente para projecao.
     BR_SHARE = 1.7  # Brasscom, 2024 (parte interessada, identificada na fonte)
     esc6 = alt.Scale(domain=[2014.6, 2026.2])
 
     irl = (
         alt.Chart(anual)
         .mark_line(
-            strokeWidth=3, color=GRAY_MID,
-            point=alt.OverlayMarkDef(size=40, filled=True, color=GRAY_MID),
+            strokeWidth=3, color=ACCENT_SOFT,
+            point=alt.OverlayMarkDef(size=40, filled=True, color=ACCENT_SOFT),
         )
         .encode(
             x=alt.X(
